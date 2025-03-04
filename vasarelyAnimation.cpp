@@ -69,8 +69,8 @@ public:
 		int slices = 10;
 		for (int i = 0; i < slices; i++)
 		{
-			float vertical_offset = (1 - cos(((float)i / slices - 0.5f) * PI)) / 10.0f * sin(dT * 2);
-			float horizontal_offset = (1 - cos(((float)i / slices - 0.5f) * PI)) / 10.0f * cos(dT * 2);
+			float vertical_offset = (1 - cos(((float)i / slices - 0.5f) * PI)) / 10.0f * pow(sin(dT * 2), 3) * cos(dT * 2);
+			float horizontal_offset = (1 - cos(((float)i / slices - 0.5f) * PI)) / 10.0f * pow(cos(dT * 2), 3) * sin(dT * 2);
 			// float horizontal_offset = (cos(((float)i / slices - 0.5f) * PI + PI / 2.0f)) / 8.0f * sin(dT);
 			gpuProgram->setUniform(vec2(0.5f + horizontal_offset, 0.5f + vertical_offset), "circleCenter");
 			gpuProgram->setUniform((slices - i) / (float)slices / 2.2f, "radius");
@@ -83,8 +83,10 @@ public:
 		dT += (endTime - startTime);
 		refreshScreen();
 	}
-	void onKeyboard(int key) {
-		if (key == GLFW_KEY_SPACE) {
+	void onKeyboard(int key)
+	{
+		if (key == GLFW_KEY_SPACE)
+		{
 			exit(0);
 		}
 		printf("key: %d\n", key);
