@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.10)
 
-set(PROJECT_NAME greenTriangle) # Set this to your main .cpp file's name, this will be the name of the output executable as well
+set(PROJECT_NAME lab1) # Set this to your main .cpp file's name, this will be the name of the output executable as well
 
 project(${PROJECT_NAME} LANGUAGES CXX C)
 
