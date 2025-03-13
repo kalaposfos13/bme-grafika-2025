@@ -48,7 +48,9 @@ public:
     float len2() {
         return x * x + y * y;
     }
-
+    float steepness() {
+        return x / y;
+    }
     Vec3 operator+(const Vec3& o) const {
         return Vec3(x + o.x, y + o.y, z + o.z);
     }
@@ -93,8 +95,28 @@ void getLineEndsFromTwoPoints(Vec3 p1, Vec3 p2, Vec3& op1, Vec3& op2) {
     // the first vector
 }
 Vec3 getLineIntersection(Vec3 l1p1, Vec3 l1p2, Vec3 l2p1, Vec3 l2p2) {
-
+    // Compute direction vectors
+    Vec3 d1 = l1p2 - l1p1;
+    Vec3 d2 = l2p2 - l2p1;
+    
+    // Check if lines are parallel
+    if (d1.steepness() == d2.steepness()) {
+        return Vec3(2, 2, 1); // Parallel case
+    }
+    
+    // Solve for intersection using determinant method
+    float det = d1.x * d2.y - d1.y * d2.x;
+    if (det == 0) {
+        return Vec3(2, 2, 1); // Lines are coincident or parallel
+    }
+    
+    float t = ((l2p1.x - l1p1.x) * d2.y - (l2p1.y - l1p1.y) * d2.x) / det;
+    
+    // Compute intersection point
+    Vec3 intersection = l1p1 + d1 * t;
+    return Vec3(intersection.x, intersection.y, 1);
 }
+
 
 class GreenTriangleApp : public glApp {
     Geometry<Vec3>* pointList;
@@ -127,8 +149,7 @@ public:
         glClear(GL_COLOR_BUFFER_BIT);
         glViewport(0, 0, winWidth, winHeight);
 
-        Vec3 deltaLineMovement =
-            ((movingLineCurrent - movingLineOrigin));
+        Vec3 deltaLineMovement = ((movingLineCurrent - movingLineOrigin));
         if (isMovingLine) {
             lineList->Vtx()[movingLineIndex * 2] += deltaLineMovement;
             lineList->Vtx()[movingLineIndex * 2 + 1] += deltaLineMovement;
@@ -188,6 +209,11 @@ public:
             movingLineCurrent = movingLineOrigin;
             movingLineIndex = 0;
             break;
+        case InputMode::AddIntersectionPoint: {
+            auto& ll = lineList->Vtx();
+            pointList->Vtx().push_back(getLineIntersection(ll[0], ll[1], ll[2], ll[3]));
+            break;
+        }
         default:
             break;
         }
@@ -223,8 +249,7 @@ public:
             return;
         }
         isMovingLine = false;
-        Vec3 deltaLineMovement =
-            (movingLineCurrent - movingLineOrigin);
+        Vec3 deltaLineMovement = (movingLineCurrent - movingLineOrigin);
         lineList->Vtx()[movingLineIndex * 2] += deltaLineMovement;
         lineList->Vtx()[movingLineIndex * 2 + 1] += deltaLineMovement;
         refreshScreen();
