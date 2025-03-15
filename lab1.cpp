@@ -1,3 +1,9 @@
+/*
+code golfed version (546 B):
+#include"framework.h"
+char*c="#version 330\nin vec3 P;void main(){gl_Position=vec4(P,1);}",*f="#version 330\nuniform vec3 color;out vec4 o;void main(){o=vec4(color,1);}";float t=1/3.,h=-.5;vec3 v(float x,float y=t){return vec3(x,y,1);}class A:glApp{public:A():glApp(""){}void onDisplay(){auto*p=new Geometry<vec3>,P=*p;auto*g=new GPUProgram(c,f);glPointSize(9);glLineWidth(3);P.Vtx()={v(-1,.65),v(1,.05),v(-1),v(1)};P.updateGPU();P.Draw(g,1,v(0,1));P.Vtx()={v(h,-h),v(-t/2,.4),v(t/5),v(h,h),v(-h,h)};P.updateGPU();P.Draw(g,0,vec3(1,0,0));}};A a;
+*/
+
 #include "framework.h"
 
 const char* vertSource = R"(
@@ -51,6 +57,13 @@ public:
     float steepness() {
         return x / y;
     }
+    float dot(const Vec3& other) const {
+        return x * other.x + y * other.y + z * other.z;
+    }
+    float length() const {
+        return std::sqrt(x * x + y * y + z * z);
+    }
+
     Vec3 operator+(const Vec3& o) const {
         return Vec3(x + o.x, y + o.y, z + o.z);
     }
@@ -64,6 +77,12 @@ public:
     Vec3 operator-=(const Vec3& o) {
         x -= o.x, y -= o.y, z -= o.z;
         return *this;
+    }
+    bool operator==(const Vec3& o) {
+        return x == o.x && y == o.y && z == o.z;
+    }
+    bool operator!=(const Vec3& o) {
+        return x != o.x || y != o.y || z != o.z;
     }
     Vec3 operator*(const float& s) const {
         return Vec3(x * s, y * s, z * s);
@@ -98,25 +117,33 @@ Vec3 getLineIntersection(Vec3 l1p1, Vec3 l1p2, Vec3 l2p1, Vec3 l2p2) {
     // Compute direction vectors
     Vec3 d1 = l1p2 - l1p1;
     Vec3 d2 = l2p2 - l2p1;
-    
+
     // Check if lines are parallel
     if (d1.steepness() == d2.steepness()) {
         return Vec3(2, 2, 1); // Parallel case
     }
-    
+
     // Solve for intersection using determinant method
     float det = d1.x * d2.y - d1.y * d2.x;
     if (det == 0) {
         return Vec3(2, 2, 1); // Lines are coincident or parallel
     }
-    
+
     float t = ((l2p1.x - l1p1.x) * d2.y - (l2p1.y - l1p1.y) * d2.x) / det;
-    
+
     // Compute intersection point
     Vec3 intersection = l1p1 + d1 * t;
     return Vec3(intersection.x, intersection.y, 1);
 }
+float pointLineDistance(const Vec3& l1, const Vec3& l2, const Vec3& p) {
+    Vec3 lineDir = l2 - l1;
+    Vec3 toPoint = p - l1;
 
+    float t = toPoint.dot(lineDir) / lineDir.dot(lineDir);
+    Vec3 projection = l1 + lineDir * t;
+
+    return (p - projection).length();
+}
 
 class GreenTriangleApp : public glApp {
     Geometry<Vec3>* pointList;
@@ -126,7 +153,19 @@ class GreenTriangleApp : public glApp {
     InputMode mode;
     bool isMovingLine = false;
     Vec3 movingLineOrigin, movingLineCurrent;
-    int movingLineIndex;
+    int movingLineIndex, firstIntersectionLineIndex = -1;
+    int getClickedLineIdx(Vec3 c) {
+        float minLineDist = pointLineDistance(lineList->Vtx()[0], lineList->Vtx()[1], c);
+        int minLineIdx = 0;
+        for (int i = 0; i < lineList->Vtx().size(); i += 2) {
+            float dist = pointLineDistance(lineList->Vtx()[i], lineList->Vtx()[i + 1], c);
+            if (minLineDist > dist) {
+                minLineDist = dist;
+                minLineIdx = i / 2;
+            }
+        }
+        return minLineDist <= 0.05 ? minLineIdx : -1;
+    }
 
 public:
     GreenTriangleApp() : glApp("Homework 1") {}
@@ -168,11 +207,11 @@ public:
         if (but != MOUSE_LEFT) {
             return;
         }
-        Vec3 mouseCoordsToViewCoords = Vec3(pX, pY, 1.0f).windowToViewSpace();
+        Vec3 click = Vec3(pX, pY, 1.0f).windowToViewSpace();
 
         switch (mode) {
         case InputMode::AddPoint:
-            pointList->Vtx().push_back(mouseCoordsToViewCoords);
+            pointList->Vtx().push_back(click);
             pointList->updateGPU();
             printf("Added point\n");
             break;
@@ -180,8 +219,8 @@ public:
             Vec3 selectedPoint = Vec3(0.0f, 0.0f, -1.0f);
             for (auto& pt : pointList->Vtx()) {
                 // printf("pt: %f %f %f\n", pt.x, pt.y, pt.z);
-                // printf("dist: %f\n", len2(mouseCoordsToViewCoords, pt));
-                if (Vec3(mouseCoordsToViewCoords - pt).len2() < 0.005f) {
+                // printf("dist: %f\n", len2(click, pt));
+                if (Vec3(click - pt).len2() < 0.005f) {
                     // printf("Clicked in an epsilon range of a point\n");
                     selectedPoint = pt;
                     break;
@@ -192,7 +231,7 @@ public:
             } else if (lineTempPoint.z == -1) {
                 lineTempPoint = selectedPoint;
                 printf("Selected first point of line\n");
-            } else {
+            } else if (selectedPoint != lineTempPoint) {
                 Vec3 line1(1), line2(1);
                 getLineEndsFromTwoPoints(selectedPoint, lineTempPoint, line1, line2);
                 lineList->Vtx().push_back(line1);
@@ -203,15 +242,28 @@ public:
             }
             break;
         }
-        case InputMode::MoveLine:
-            isMovingLine = true;
-            movingLineOrigin = Vec3(pX, pY).windowToViewSpace();
-            movingLineCurrent = movingLineOrigin;
-            movingLineIndex = 0;
+        case InputMode::MoveLine: {
+            int i = getClickedLineIdx(click);
+            if (i != -1) {
+                isMovingLine = true;
+                movingLineOrigin = click;
+                movingLineCurrent = click;
+                movingLineIndex = i;
+            }
             break;
+        }
         case InputMode::AddIntersectionPoint: {
             auto& ll = lineList->Vtx();
-            pointList->Vtx().push_back(getLineIntersection(ll[0], ll[1], ll[2], ll[3]));
+            // pointList->Vtx().push_back(getLineIntersection(ll[0], ll[1], ll[2], ll[3]));
+            int i = getClickedLineIdx(click);
+            if (firstIntersectionLineIndex == -1) {
+                firstIntersectionLineIndex = i;
+            } else if (i != -1) {
+                pointList->Vtx().push_back(getLineIntersection(
+                    ll[firstIntersectionLineIndex * 2], ll[firstIntersectionLineIndex * 2 + 1],
+                    ll[i * 2], ll[i * 2 + 1]));
+                    firstIntersectionLineIndex = -1;
+            }
             break;
         }
         default:
