@@ -309,13 +309,24 @@ const char* fragSourceColor = R"(
 )";
 
 const int winWidth = 600, winHeight = 600;
-const int curveSegments = 16;
+const int curveSegments = 64;
+vec2 windowToViewSpace(vec2 v) {
+    return vec3((((float)v.x / winWidth) * 2.0f) - 1.0f,
+                (((float)(winHeight - v.y) / winHeight) * 2.0f) - 1.0f, 1.0f);
+}
+float length(vec2 v) {
+    return sqrt(v.x * v.x + v.y * v.y);
+}
 
 class GreenTriangleApp : public glApp {
     Geometry<float>* segments;
     Geometry<vec2>* controlPoints;
     GpuProgram* gpuProgramBezier;
     GpuProgram* gpuProgramPoints;
+    
+    bool isMovingPoint = false;
+    vec2 movingPointOrigin, movingPointCurrent;
+    int movingPointIndex;
 
 public:
     GreenTriangleApp() : glApp("bezier") {}
@@ -347,14 +358,53 @@ public:
     void onDisplay() {
         glClearColor(0, 0, 0, 0);     // háttér szín
         glClear(GL_COLOR_BUFFER_BIT); // rasztertár törlés
+        controlPoints->Vtx()[movingPointIndex] += movingPointCurrent - movingPointOrigin;
         gpuProgramBezier->Use();
         glUniform2fv(gpuProgramBezier->getLocation("controlPoints"), 8,
                      (float*)controlPoints->Vtx().data());
         segments->updateGPU();
-        segments->Draw((GPUProgram*)gpuProgramBezier, GL_POINTS, vec3(0.0f, 1.0f, 0.0f));
+        segments->Draw((GPUProgram*)gpuProgramBezier, GL_LINE_STRIP, vec3(0.0f, 1.0f, 0.0f));
         gpuProgramPoints->Use();
         controlPoints->updateGPU();
         controlPoints->Draw((GPUProgram*)gpuProgramPoints, GL_POINTS, vec3(1.0f, 0.0f, 0.0f));
+        controlPoints->Vtx()[movingPointIndex] -= movingPointCurrent - movingPointOrigin;
+    }
+    void onMousePressed(MouseButton but, int pX, int pY) {
+        vec2 click = windowToViewSpace(vec2(pX, pY));
+        float minDist = length(click - controlPoints->Vtx()[0]);
+        int minIdx = 0;
+        for (int i = 1; i < 4; i++) {
+            float dist = length(click - controlPoints->Vtx()[i]);
+            if(dist < minDist) {
+                minDist = dist;
+                minIdx = i;
+            }
+        }
+        if (minDist <= 0.05) {
+            printf("we clicked on one of the control points\n");
+            isMovingPoint = true;
+            movingPointIndex = minIdx;
+            movingPointOrigin = click;
+            movingPointCurrent = click;
+        }
+        refreshScreen();
+    }
+    void onMouseReleased(MouseButton but, int pX, int pY) {
+        if (!isMovingPoint) {
+            return;
+        }
+        isMovingPoint = false;
+        controlPoints->Vtx()[movingPointIndex] += movingPointCurrent - movingPointOrigin;
+        movingPointCurrent = vec2(0,0);
+        movingPointOrigin = vec2(0,0);
+        refreshScreen();
+    }
+    void onMouseMotion(int pX, int pY) {
+        if (!isMovingPoint) {
+            return;
+        }
+        movingPointCurrent = windowToViewSpace(vec2(pX, pY));
+        refreshScreen();
     }
 };
 
