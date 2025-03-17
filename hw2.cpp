@@ -309,7 +309,7 @@ const char* fragSourceColor = R"(
 )";
 
 const int winWidth = 600, winHeight = 600;
-const int curveSegments = 64;
+const int curveSegments = 128;
 vec2 windowToViewSpace(vec2 v) {
     return vec3((((float)v.x / winWidth) * 2.0f) - 1.0f,
                 (((float)(winHeight - v.y) / winHeight) * 2.0f) - 1.0f, 1.0f);
@@ -344,9 +344,9 @@ public:
         segments->updateGPU();
         controlPoints->Vtx() = {
             vec2(-.5, -.5),
-            vec2(-.5, .5),
-            vec2(.5, -.5),
             vec2(.5, .5),
+            vec2(.5, -.5),
+            vec2(-.5, .5),
         };
         gpuProgramBezier = new GpuProgram(vertSourceBezier, fragSourceColor);
         gpuProgramPoints = new GpuProgram(vertSourcePoints, fragSourceColor);
