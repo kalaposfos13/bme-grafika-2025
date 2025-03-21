@@ -38,4 +38,4 @@ target_include_directories(${PROJECT_NAME} PRIVATE
 )
 
 # Link against GLFW and GLM
-target_link_libraries(${PROJECT_NAME} PRIVATE glfw glm)
+target_link_libraries(${PROJECT_NAME} PRIVATE glfw)
