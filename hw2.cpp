@@ -1,5 +1,9 @@
 #include "framework.h"
 
+// class vec2 {
+//     float x, y;
+//     vec2(float _x = 0,  float _y = 0) : x(_x), y(_y) {}
+// };
 // I love copy pasting things just to change the visibility of one thing
 class GpuProgram {
     GLuint shaderProgramId = 0;
@@ -309,7 +313,8 @@ enum InputMode {
     MovePoint,
 };
 const int winWidth = 600, winHeight = 600;
-const int curveSegments = 128;
+const int curveSegments = 4;
+float curviness = 0.5;
 vec2 windowToViewSpace(vec2 v) {
     return vec2((((float)v.x / winWidth) * 2.0f) - 1.0f,
                 (((float)(winHeight - v.y) / winHeight) * 2.0f) - 1.0f);
@@ -321,7 +326,7 @@ class GreenTriangleApp : public glApp {
     GpuProgram* gpuProgramPoints;
 
     InputMode mode = AddPoint;
-    bool isMovingPoint = false;
+    bool isMovingPoint = false, displayControlPoints = false, displaySplinePoints = true;
     vec2 movingPointOrigin, movingPointCurrent;
     int movingPointIndex;
 
@@ -340,7 +345,8 @@ public:
         }
         segments->updateGPU();
         splinePoints->Vtx() = {
-            vec2(0, 0), vec2(0, 0),
+            vec2(0, 0),
+            vec2(0, 0),
         };
         gpuProgramBezier = new GpuProgram(vertSourceBezier, fragSourceColor);
         gpuProgramPoints = new GpuProgram(vertSourcePoints, fragSourceColor);
@@ -350,7 +356,7 @@ public:
 
     // Ablak újrarajzolás
     void onDisplay() {
-        glClearColor(0, 0, 0, 0);     // háttér szín
+        glClearColor(0, 0, 0, 1);     // háttér szín
         glClear(GL_COLOR_BUFFER_BIT); // rasztertár törlés
         if (splinePoints->Vtx().size() < 4) {
             return;
@@ -365,8 +371,8 @@ public:
         for (int i = 1; i < splinePoints->Vtx().size() - 2; i++) {
             controlPoints->Vtx() = {
                 sp[i],
-                sp[i] + (sp[i + 1] - sp[i - 1]) / 6.0f,
-                sp[i + 1] - (sp[i + 2] - sp[i]) / 6.0f,
+                sp[i] + (sp[i + 1] - sp[i - 1]) * curviness / 3.0f,
+                sp[i + 1] - (sp[i + 2] - sp[i]) * curviness / 3.0f,
                 sp[i + 1],
             };
             // draw a single curve
@@ -376,25 +382,53 @@ public:
             segments->updateGPU();
             segments->Draw((GPUProgram*)gpuProgramBezier, GL_LINE_STRIP, vec3(1.0f, 1.0f, 0.0f));
             // draw the control points for the current curve with alternating colors
-            glPointSize(10);
-            gpuProgramPoints->Use();
-            controlPoints->updateGPU();
-            controlPoints->Draw((GPUProgram*)gpuProgramPoints, GL_POINTS,
-                                vec3(0.0f, i % 2 == 1 ? 1.0f : 0.0f, i % 2 == 0 ? 1.0f : 0.0f));
+            if (displayControlPoints) {
+                glPointSize(10);
+                gpuProgramPoints->Use();
+                controlPoints->updateGPU();
+                controlPoints->Draw((GPUProgram*)gpuProgramPoints, GL_POINTS,
+                                    vec3(0.0f, i % 2 == 1 ? 1.0f : 0.0f, i % 2 == 0 ? 1.0f : 0.0f));
+            }
         }
         // draw the spline points
         // glPointSize(5);
-        gpuProgramPoints->Use();
-        sp[0] = vec2(2, 2);
-        sp[last] = vec2(2, 2);
-        splinePoints->updateGPU();
-        splinePoints->Draw((GPUProgram*)gpuProgramPoints, GL_POINTS, vec3(1.0f, 0.0f, 0.0f));
+        if (displaySplinePoints) {
+            gpuProgramPoints->Use();
+            sp[0] = vec2(2, 2);
+            sp[last] = vec2(2, 2);
+            splinePoints->updateGPU();
+            splinePoints->Draw((GPUProgram*)gpuProgramPoints, GL_POINTS, vec3(1.0f, 0.0f, 0.0f));
+        }
 
         splinePoints->Vtx()[movingPointIndex] += -(movingPointCurrent - movingPointOrigin);
     }
     void onMousePressed(MouseButton but, int pX, int pY) {
         vec2 click = windowToViewSpace(vec2(pX, pY));
-        if (mode == MovePoint) {
+        if (but == MOUSE_LEFT) {
+            if (mode == MovePoint) {
+                float minDist = length(click - splinePoints->Vtx()[0]);
+                int minIdx = 0;
+                for (int i = 1; i < splinePoints->Vtx().size(); i++) {
+                    float dist = length(click - splinePoints->Vtx()[i]);
+                    if (dist < minDist) {
+                        minDist = dist;
+                        minIdx = i;
+                    }
+                }
+                if (minDist <= 0.05) {
+                    printf("we clicked on one of the control points\n");
+                    isMovingPoint = true;
+                    movingPointIndex = minIdx;
+                    movingPointOrigin = click;
+                    movingPointCurrent = click;
+                }
+            } else if (mode == AddPoint) {
+                splinePoints->Vtx().insert(--splinePoints->Vtx().end(), click);
+                printf("Added point %f %f\n", click.x, click.y);
+                // *--splinePoints->Vtx().end() = click;
+                // splinePoints->Vtx().push_back(vec2(0));
+            }
+        } else if (but == MOUSE_RIGHT) {
             float minDist = length(click - splinePoints->Vtx()[0]);
             int minIdx = 0;
             for (int i = 1; i < splinePoints->Vtx().size(); i++) {
@@ -406,16 +440,8 @@ public:
             }
             if (minDist <= 0.05) {
                 printf("we clicked on one of the control points\n");
-                isMovingPoint = true;
-                movingPointIndex = minIdx;
-                movingPointOrigin = click;
-                movingPointCurrent = click;
+                splinePoints->Vtx().erase(splinePoints->Vtx().begin() + minIdx);
             }
-        } else if (mode == AddPoint) {
-            splinePoints->Vtx().insert(--splinePoints->Vtx().end(), click);
-            printf("Added point %f %f\n", click.x, click.y);
-            // *--splinePoints->Vtx().end() = click;
-            // splinePoints->Vtx().push_back(vec2(0));
         }
         refreshScreen();
     }
@@ -446,9 +472,22 @@ public:
             break;
         case 'q':
             exit(0);
+        case 'i':
+            curviness += 0.05;
+            break;
+        case 'k':
+            curviness -= 0.05;
+            break;
+        case 'o':
+            displayControlPoints ^= true;
+            break;
+        case 'l':
+            displaySplinePoints ^= true;
+            break;
         default:
             break;
         }
+        refreshScreen();
     }
 };
 
