@@ -1,6 +1,3 @@
-//=============================================================================================
-// Zöld háromszög: A framework.h osztályait felhasználó megoldás
-//=============================================================================================
 #include "framework.h"
 
 // I love copy pasting things just to change the visibility of one thing
@@ -314,17 +311,8 @@ enum InputMode {
 const int winWidth = 600, winHeight = 600;
 const int curveSegments = 128;
 vec2 windowToViewSpace(vec2 v) {
-    return vec3((((float)v.x / winWidth) * 2.0f) - 1.0f,
-                (((float)(winHeight - v.y) / winHeight) * 2.0f) - 1.0f, 1.0f);
-}
-float length(vec2 v) {
-    return sqrt(v.x * v.x + v.y * v.y);
-}
-vec2 operator/(const vec2& t, const float& f) {
-    return vec2(t.x / f, t.y / f);
-}
-vec2 operator*(const vec2& t, const float& f) {
-    return vec2(t.x * f, t.y * f);
+    return vec2((((float)v.x / winWidth) * 2.0f) - 1.0f,
+                (((float)(winHeight - v.y) / winHeight) * 2.0f) - 1.0f);
 }
 class GreenTriangleApp : public glApp {
     Geometry<float>* segments;
@@ -349,13 +337,10 @@ public:
         for (int i = 0; i <= curveSegments; i++) {
             float t = (float)i / (float)curveSegments;
             segments->Vtx().emplace_back(t);
-            printf("segment %f added \n", t);
         }
         segments->updateGPU();
         splinePoints->Vtx() = {
             vec2(0, 0), vec2(0, 0),
-            // vec2(.5, -.5),
-            // vec2(-.5, .5),
         };
         gpuProgramBezier = new GpuProgram(vertSourceBezier, fragSourceColor);
         gpuProgramPoints = new GpuProgram(vertSourcePoints, fragSourceColor);
@@ -372,10 +357,10 @@ public:
         }
         splinePoints->Vtx()[movingPointIndex] += movingPointCurrent - movingPointOrigin;
         auto& sp = splinePoints->Vtx();
-        // calculate pre start and post end point of spline buffer
-        sp[0] = sp[1] * 2 - sp[2];
         int last = sp.size() - 1;
-        sp[last] = sp[last - 1] * 2 - sp[last - 2];
+        // calculate pre start and post end point of spline buffer
+        sp[0] = 2.0f * sp[1] - sp[2];
+        sp[last] = 2.0f * sp[last - 1] - sp[last - 2];
         // draw splines
         for (int i = 1; i < splinePoints->Vtx().size() - 2; i++) {
             controlPoints->Vtx() = {
@@ -391,23 +376,23 @@ public:
             glUniform2fv(gpuProgramBezier->getLocation("controlPoints"), 8,
                          (float*)controlPoints->Vtx().data());
             segments->updateGPU();
-            segments->Draw((GPUProgram*)gpuProgramBezier, GL_LINE_STRIP, vec3(0.0f, 1.0f, 0.0f));
-            // draw a point collection
-            glPointSize(10);
-            gpuProgramPoints->Use();
-            controlPoints->updateGPU();
-            controlPoints->Draw((GPUProgram*)gpuProgramPoints, GL_POINTS,
-                                vec3(1.0f, i % 2 == 0 ? 1.0f : 0.0f, 0.0f));
+            segments->Draw((GPUProgram*)gpuProgramBezier, GL_LINE_STRIP, vec3(1.0f, 1.0f, 0.0f));
+            // draw the control points for the current curve with alternating colors
+            // glPointSize(10);
+            // gpuProgramPoints->Use();
+            // controlPoints->updateGPU();
+            // controlPoints->Draw((GPUProgram*)gpuProgramPoints, GL_POINTS,
+            //                     vec3(1.0f, i % 2 == 0 ? 1.0f : 0.0f, 0.0f));
         }
-        // draw a point collection
-        glPointSize(5);
+        // draw the spline points
+        // glPointSize(5);
         gpuProgramPoints->Use();
+        sp[0] = vec2(2, 2);
+        sp[last] = vec2(2, 2);
         splinePoints->updateGPU();
-        splinePoints->Draw((GPUProgram*)gpuProgramPoints, GL_POINTS, vec3(1.0f, 0.0f, 1.0f));
+        splinePoints->Draw((GPUProgram*)gpuProgramPoints, GL_POINTS, vec3(1.0f, 0.0f, 0.0f));
 
-        splinePoints->Vtx()[movingPointIndex] -= movingPointCurrent - movingPointOrigin;
-        // sp[0] = vec2(0);
-        // sp[last] = vec2(0);
+        splinePoints->Vtx()[movingPointIndex] += -(movingPointCurrent - movingPointOrigin);
     }
     void onMousePressed(MouseButton but, int pX, int pY) {
         vec2 click = windowToViewSpace(vec2(pX, pY));
@@ -460,7 +445,7 @@ public:
         case 'm':
             mode = MovePoint;
             break;
-        case ' ':
+        case 'q':
             exit(0);
         default:
             break;
