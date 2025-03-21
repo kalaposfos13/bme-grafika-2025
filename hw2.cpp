@@ -309,7 +309,7 @@ enum InputMode {
     MovePoint,
 };
 const int winWidth = 600, winHeight = 600;
-const int curveSegments = 128;
+const int curveSegments = 4;
 vec2 windowToViewSpace(vec2 v) {
     return vec2((((float)v.x / winWidth) * 2.0f) - 1.0f,
                 (((float)(winHeight - v.y) / winHeight) * 2.0f) - 1.0f);
@@ -415,6 +415,7 @@ public:
             }
         } else if (mode == AddPoint) {
             splinePoints->Vtx().insert(--splinePoints->Vtx().end(), click);
+            printf("Added point %f %f\n", click.x, click.y);
             // *--splinePoints->Vtx().end() = click;
             // splinePoints->Vtx().push_back(vec2(0));
         }
