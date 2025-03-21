@@ -2,8 +2,11 @@
 // OpenGL keretrendszer: GLFW és GLAD alapú implementáció
 //=============================================================================================
 #include "framework.h"
+#include <time.h>
 #define GLFW_INCLUDE_NONE
 #include <GLFW/glfw3.h>
+#include <unistd.h>
+#include <bits/this_thread_sleep.h>
 
 // Keretrendszer állapota
 static int minorNumber = 3, majorNumber = 3;
@@ -85,6 +88,7 @@ int main(void) {
 	glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, majorNumber);
 	glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, minorNumber);
 	glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
+	glfwWindowHint(GLFW_SAMPLES, 4);
 
 	window = glfwCreateWindow(windowWidth, windowHeight, windowCaption, NULL, NULL);
 	if (!window) {
@@ -120,6 +124,7 @@ int main(void) {
 			glfwSwapBuffers(window); // buffercsere
 			screenRefresh = false;
 		}
+		std::this_thread::sleep_for(std::chrono::milliseconds(5));
 	}
 	glfwDestroyWindow(window);
 	glfwTerminate();
