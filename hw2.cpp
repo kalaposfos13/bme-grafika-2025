@@ -309,7 +309,7 @@ enum InputMode {
     MovePoint,
 };
 const int winWidth = 600, winHeight = 600;
-const int curveSegments = 4;
+const int curveSegments = 128;
 vec2 windowToViewSpace(vec2 v) {
     return vec2((((float)v.x / winWidth) * 2.0f) - 1.0f,
                 (((float)(winHeight - v.y) / winHeight) * 2.0f) - 1.0f);
@@ -365,8 +365,6 @@ public:
         for (int i = 1; i < splinePoints->Vtx().size() - 2; i++) {
             controlPoints->Vtx() = {
                 sp[i],
-                // sp[i],
-                // sp[i + 1],
                 sp[i] + (sp[i + 1] - sp[i - 1]) / 6.0f,
                 sp[i + 1] - (sp[i + 2] - sp[i]) / 6.0f,
                 sp[i + 1],
@@ -378,11 +376,11 @@ public:
             segments->updateGPU();
             segments->Draw((GPUProgram*)gpuProgramBezier, GL_LINE_STRIP, vec3(1.0f, 1.0f, 0.0f));
             // draw the control points for the current curve with alternating colors
-            // glPointSize(10);
-            // gpuProgramPoints->Use();
-            // controlPoints->updateGPU();
-            // controlPoints->Draw((GPUProgram*)gpuProgramPoints, GL_POINTS,
-            //                     vec3(1.0f, i % 2 == 0 ? 1.0f : 0.0f, 0.0f));
+            glPointSize(10);
+            gpuProgramPoints->Use();
+            controlPoints->updateGPU();
+            controlPoints->Draw((GPUProgram*)gpuProgramPoints, GL_POINTS,
+                                vec3(0.0f, i % 2 == 1 ? 1.0f : 0.0f, i % 2 == 0 ? 1.0f : 0.0f));
         }
         // draw the spline points
         // glPointSize(5);
